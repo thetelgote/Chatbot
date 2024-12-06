@@ -1,0 +1,284 @@
+from flask import Flask, request, render_template_string, jsonify, redirect, url_for, session
+import sqlite3
+from datetime import datetime
+
+app = Flask(__name__)
+app.secret_key = 'secret_key_for_session_management'  # Used to manage sessions securely
+
+# Database setup
+def init_db():
+    conn = sqlite3.connect('chatbot.db')
+    c = conn.cursor()
+
+    # Messages table
+    c.execute(''' 
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_message TEXT,
+            bot_response TEXT,
+            timestamp TEXT
+        )
+    ''')
+
+    # Users table
+    c.execute(''' 
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password TEXT
+        )
+    ''')
+
+    # Responses table
+    c.execute(''' 
+        CREATE TABLE IF NOT EXISTS responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            keyword TEXT UNIQUE,
+            response TEXT
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+# Initialize the database
+init_db()
+
+# Function to save conversation to the database
+def save_message(user_message, bot_response):
+    conn = sqlite3.connect('chatbot.db')
+    c = conn.cursor()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO messages (user_message, bot_response, timestamp) VALUES (?, ?, ?)",
+              (user_message, bot_response, timestamp))
+    conn.commit()
+    conn.close()
+
+# Function to fetch all responses
+def fetch_responses():
+    conn = sqlite3.connect('chatbot.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM responses")
+    data = c.fetchall()
+    conn.close()
+    return data
+
+# Insert or update a response
+def manage_response(keyword, response, update=False):
+    conn = sqlite3.connect('chatbot.db')
+    c = conn.cursor()
+    if update:
+        c.execute("UPDATE responses SET response = ? WHERE keyword = ?", (response, keyword))
+    else:
+        c.execute("INSERT INTO responses (keyword, response) VALUES (?, ?)", (keyword, response))
+    conn.commit()
+    conn.close()
+
+# Basic NLP response logic
+def generate_response(user_message):
+    conn = sqlite3.connect('chatbot.db')
+    c = conn.cursor()
+    c.execute("SELECT response FROM responses WHERE ? LIKE '%' || keyword || '%'", (user_message,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return "I'm sorry, I didn't understand that. Can you please clarify?"
+
+# Common CSS for all pages
+COMMON_CSS = '''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{ title }}</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body {
+                font-family: 'Roboto', sans-serif;
+                background-color: #f9f9f9;
+            }
+            h3 {
+                color: #333;
+                font-weight: 700;
+                margin-bottom: 20px;
+            }
+            .btn {
+                font-weight: 700;
+            }
+            .container {
+                margin-top: 50px;
+            }
+            ul {
+                list-style-type: none;
+                padding: 0;
+            }
+            li {
+                background-color: #fff;
+                margin: 10px 0;
+                padding: 15px;
+                border-radius: 5px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: transform 0.2s ease-in-out;
+            }
+            li:hover {
+                transform: scale(1.02);
+            }
+        </style>
+    </head>
+'''
+
+# Routes
+@app.route('/')
+def home():
+    return render_template_string(COMMON_CSS + '''
+        <body>
+            <div class="container text-center">
+                <h3 class="animate__animated animate__fadeInDown">Welcome to Chatbot</h3>
+                <div class="mt-4 animate__animated animate__fadeInUp">
+                    <a href="/login" class="btn btn-primary">Login</a>
+                    <a href="/signup" class="btn btn-success">Sign Up</a>
+                    <a href="/manage-responses" class="btn btn-warning">Manage Responses</a>
+                </div>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        conn = sqlite3.connect('chatbot.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, password))
+        user = c.fetchone()
+        conn.close()
+
+        if user:
+            session['user'] = username
+            return redirect(url_for('chatbot'))
+        else:
+            return "Invalid username or password. Please try again."
+
+    return render_template_string(COMMON_CSS + '''
+        <body>
+            <div class="container">
+                <h3 class="text-center animate__animated animate__fadeInDown">Login</h3>
+                <form method="POST" class="animate__animated animate__fadeInUp">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" name="username" id="username" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" name="password" id="password" class="form-control" required>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </div>
+                </form>
+            </div>
+        </body>
+        </html>
+    ''')
+
+@app.route('/chatbot')
+def chatbot():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    return render_template_string(COMMON_CSS + '''
+        <body>
+            <div class="container">
+                <h3 class="text-center animate__animated animate__fadeInDown">Chat with Bot</h3>
+                <div id="chat-box" class="chat-box"></div>
+                <div class="input-group mt-3 animate__animated animate__fadeInUp">
+                    <input id="user-input" type="text" class="form-control" placeholder="Type a message...">
+                    <div class="input-group-append">
+                        <button onclick="sendMessage()" class="btn btn-success">Send</button>
+                    </div>
+                </div>
+            </div>
+            <script>
+                function sendMessage() {
+                    const userInput = document.getElementById("user-input").value.trim();
+                    if (!userInput) return;
+
+                    const chatBox = document.getElementById("chat-box");
+                    chatBox.innerHTML += `<div class="message user-message">${userInput}</div>`;
+                    document.getElementById("user-input").value = "";
+
+                    fetch('/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userInput })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        chatBox.innerHTML += `<div class="message bot-message">${data.response}</div>`;
+                    });
+                }
+            </script>
+        </body>
+        </html>
+    ''')
+
+@app.route('/manage-responses', methods=['GET', 'POST'])
+def manage_responses():
+    if request.method == 'POST':
+        keyword = request.form.get('keyword')
+        response = request.form.get('response')
+        action = request.form.get('action')
+
+        if action == 'Add':
+            manage_response(keyword, response, update=False)
+        elif action == 'Update':
+            manage_response(keyword, response, update=True)
+
+    responses = fetch_responses()
+    return render_template_string(COMMON_CSS + '''
+        <body>
+            <div class="container">
+                <h3 class="animate__animated animate__fadeInDown">Manage Responses</h3>
+                <form method="POST" class="animate__animated animate__fadeInUp">
+                    <div class="form-group">
+                        <label for="keyword">Keyword</label>
+                        <input type="text" name="keyword" id="keyword" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="response">Response</label>
+                        <input type="text" name="response" id="response" class="form-control" required>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" name="action" value="Add" class="btn btn-success">Add</button>
+                        <button type="submit" name="action" value="Update" class="btn btn-warning">Update</button>
+                    </div>
+                </form>
+                <h4 class="mt-5 animate__animated animate__fadeIn">Existing Responses:</h4>
+                <ul>
+                    {% for res in responses %}
+                        <li class="animate__animated animate__fadeInRight">
+                            <strong>{{ res[1] }}</strong>: {{ res[2] }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </body>
+        </html>
+    ''', responses=responses)
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_message = request.json['message']
+    bot_response = generate_response(user_message)
+    save_message(user_message, bot_response)
+    return jsonify({'response': bot_response})
+
+if __name__ == '__main__':
+    app.run(debug=True)
