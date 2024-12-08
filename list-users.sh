@@ -1,21 +1,42 @@
 #!/bin/bash
 
-# Directory argument (e.g., Python)
-directory=$1
+# GitHub API URL
+API_URL="https://api.github.com"
 
-# Placeholder for actual logic to find users with read access
-data='{
-  "users": [
-    {"username": "user1", "permissions": "read"},
-    {"username": "user2", "permissions": "write"}
-  ]
-}'
+# GitHub username and personal access token
+USERNAME=$username
+TOKEN=$token
 
-# Check if there's any user with "read" access
-read_access_users=$(echo "$data" | jq -e '.users[] | select(.permissions == "read")')
+# User and Repository information
+REPO_OWNER=$1
+REPO_NAME=$2
 
-if [ -z "$read_access_users" ]; then
-  echo "No users with read access found for $directory/"
-else
-  echo "$read_access_users"
-fi
+# Function to make a GET request to the GitHub API
+function github_api_get {
+    local endpoint="$1"
+    local url="${API_URL}/${endpoint}"
+
+    # Send a GET request to the GitHub API with authentication
+    curl -s -u "${USERNAME}:${TOKEN}" "$url"
+}
+
+# Function to list users with read access to the repository
+function list_users_with_read_access {
+    local endpoint="repos/${REPO_OWNER}/${REPO_NAME}/collaborators"
+
+    # Fetch the list of collaborators on the repository
+    collaborators="$(github_api_get "$endpoint" | jq -r '.[] | select(.permissions.pull == true) | .login')"
+
+    # Display the list of collaborators with read access
+    if [[ -z "$collaborators" ]]; then
+        echo "No users with read access found for ${REPO_OWNER}/${REPO_NAME}."
+    else
+        echo "Users with read access to ${REPO_OWNER}/${REPO_NAME}:"
+        echo "$collaborators"
+    fi
+}
+
+# Main script
+
+echo "Listing users with read access to ${REPO_OWNER}/${REPO_NAME}..."
+list_users_with_read_access
