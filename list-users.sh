@@ -1,11 +1,16 @@
 #!/bin/bash
 
-# ... other script logic ...
+# Directory argument (e.g., Python)
+directory=$1
 
-# Assuming your JSON data is stored in a variable named 'json_data'
-users_with_read_access=$(jq '.users[] | select(.permissions | contains("read")) | .username' <<< "$json_data")
+# Placeholder for actual logic that identifies users with read access
+# Replace with your actual code to list users with read access
+data='{
+  "users": [
+    {"username": "user1", "permissions": "read"},
+    {"username": "user2", "permissions": "write"}
+  ]
+}'
 
-# Iterate over the users with read access
-for user in $users_with_read_access; do
-  echo "User $user has read access"
-done
+# Print JSON data
+echo "$data"
