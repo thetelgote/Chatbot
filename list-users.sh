@@ -3,9 +3,9 @@
 # GitHub API URL
 API_URL="https://api.github.com"
 
-# GitHub username and personal access token from environment variables
-USERNAME=$GITHUB_USERNAME
-TOKEN=$GITHUB_TOKEN
+# GitHub username and personal access token
+USERNAME=$username
+TOKEN=$token
 
 # User and Repository information
 REPO_OWNER=$1
@@ -23,12 +23,20 @@ function github_api_get {
 # Function to list users with read access to the repository
 function list_users_with_read_access {
     local endpoint="repos/${REPO_OWNER}/${REPO_NAME}/collaborators"
-    # Send GET request to fetch collaborators and filter those with read access
-    response=$(github_api_get "$endpoint")
 
-    # Parse the response and filter users with read access (You may need jq for this step)
-    echo "$response" | jq '.[] | select(.permissions.pull == true) | .login'
+    # Fetch the list of collaborators on the repository
+    collaborators="$(github_api_get "$endpoint"  "
+
+    # Display the list of collaborators with read access
+    if [[ -z "$collaborators" ]]; then
+        echo "No users with read access found for ${REPO_OWNER}/${REPO_NAME}."
+    else
+        echo "Users with read access to ${REPO_OWNER}/${REPO_NAME}:"
+        echo "$collaborators"
+    fi
 }
 
-# Run the function with the provided arguments
+# Main script
+
+echo "Listing users with read access to ${REPO_OWNER}/${REPO_NAME}..."
 list_users_with_read_access
