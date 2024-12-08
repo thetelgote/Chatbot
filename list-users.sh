@@ -1,19 +1,11 @@
 #!/bin/bash
 
-# Directory from argument
-directory=$1
+# ... other script logic ...
 
-# Placeholder logic to identify users with read access
-# Replace this with actual logic to check permissions in your environment
-data='{
-  "users": [
-    {"username": "user1", "permissions": "read"},
-    {"username": "user2", "permissions": "write"}
-  ]
-}'
+# Assuming your JSON data is stored in a variable named 'json_data'
+users_with_read_access=$(jq '.users[] | select(.permissions | contains("read")) | .username' <<< "$json_data")
 
-# Display the message about users with read access
-echo "Listing users with read access to $directory/..."
-
-# Use jq to filter users with read access
-echo "$data" | jq '.users[] | select(.permissions == "read")' || echo "No users with read access found for $directory/"
+# Iterate over the users with read access
+for user in $users_with_read_access; do
+  echo "User $user has read access"
+done
