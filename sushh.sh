@@ -3,7 +3,7 @@
 # GitHub API URL
 API_URL="https://api.github.com"
 
-# GitHub username and personal access token (use environment variables or hardcode)
+# GitHub username and personal access token (can be set as environment variables)
 USERNAME=$GITHUB_USERNAME
 TOKEN=$GITHUB_TOKEN
 
@@ -33,15 +33,26 @@ function list_collaborators {
     # Fetch collaborators
     response=$(github_api_get "$endpoint")
 
-    # Parse the response and list collaborator logins
+    # Parse the response and list collaborator logins using grep and sed (without jq)
+    echo "$response" | grep -o '"login": *"[^"]*' | sed 's/"login": "//'
+}
+
+# Function to list users with read access (you can adjust this based on specific permissions you want to check)
+function list_users_with_read_access {
+    echo "Listing users with read access to ${REPO_OWNER}/${REPO_NAME}..."
+    
+    # Endpoint for checking access (collaborators with read access)
+    endpoint="repos/${REPO_OWNER}/${REPO_NAME}/collaborators"
+
+    # Get the collaborators
+    response=$(github_api_get "$endpoint")
+
+    # Check if any users have 'read' access, using 'permissions' field
     echo "$response" | grep -o '"login": *"[^"]*' | sed 's/"login": "//'
 }
 
 # Run the function to list collaborators
 list_collaborators
 
-
-# Main script
-
-echo "Listing users with read access to ${REPO_OWNER}/${REPO_NAME}..."
+# Run the function to list users with read access
 list_users_with_read_access
