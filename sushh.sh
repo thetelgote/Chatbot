@@ -3,13 +3,19 @@
 # GitHub API URL
 API_URL="https://api.github.com"
 
-# GitHub username and personal access token
-USERNAME=$username
-TOKEN=$token
+# GitHub username and personal access token (use environment variables or hardcode)
+USERNAME=$GITHUB_USERNAME
+TOKEN=$GITHUB_TOKEN
 
-# User and Repository information
+# User and Repository information (passed as arguments to the script)
 REPO_OWNER=$1
 REPO_NAME=$2
+
+# Check if both repository owner and name are provided
+if [ -z "$REPO_OWNER" ] || [ -z "$REPO_NAME" ]; then
+    echo "Usage: $0 <repo-owner> <repo-name>"
+    exit 1
+fi
 
 # Function to make a GET request to the GitHub API
 function github_api_get {
@@ -20,21 +26,20 @@ function github_api_get {
     curl -s -u "${USERNAME}:${TOKEN}" "$url"
 }
 
-# Function to list users with read access to the repository
-function list_users_with_read_access {
+# Function to list collaborators of the repository
+function list_collaborators {
     local endpoint="repos/${REPO_OWNER}/${REPO_NAME}/collaborators"
+    
+    # Fetch collaborators
+    response=$(github_api_get "$endpoint")
 
-    # Fetch the list of collaborators on the repository
-    collaborators="$(github_api_get "$endpoint" "
-
-    # Display the list of collaborators with read access
-    if [[ -z "$collaborators" ]]; then
-        echo "No users with read access found for ${REPO_OWNER}/${REPO_NAME}."
-    else
-        echo "Users with read access to ${REPO_OWNER}/${REPO_NAME}:"
-        echo "$collaborators"
-    fi
+    # Parse the response and list collaborator logins
+    echo "$response" | grep -o '"login": *"[^"]*' | sed 's/"login": "//'
 }
+
+# Run the function to list collaborators
+list_collaborators
+
 
 # Main script
 
