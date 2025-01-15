@@ -1,0 +1,15 @@
+RUN the simple html file on aws 
+HTML FILE 
+sudo apt update
+
+sudo apt install apache2 
+// install Apache server 
+
+sudo systemctl enable apache2
+sudo systemctl start apache2
+
+cd /var/www/html
+run it 
+
+sudo nano index.html
+
